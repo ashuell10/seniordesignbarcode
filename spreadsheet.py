@@ -1,5 +1,6 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import cv2
 import datetime
 import os
 import pygame
@@ -7,6 +8,7 @@ import pygame.camera
 import pyzbar.pyzbar
 from PIL import Image
 from tesserocr import PyTessBaseAPI
+import SimpleCV
 
 #globalvariables
 row = 2
@@ -16,6 +18,8 @@ name = "tempname"
 firstname = "first"
 lastname = "last"
 teacher = "teacher"
+
+currentlysignedoutstudents = []
 
 #sets up google sheet stuff
 def setupgooglesheet():
@@ -35,67 +39,116 @@ def setupgooglesheet():
     sheet.update_cell(1, 2, "Student's(First name)")
     sheet.update_cell(1, 3, "Student's(ID's)")
     sheet.update_cell(1, 4, "Teachers")
-    sheet.update_cell(1, 5, "Time Out")
-    sheet.update_cell(1, 6, "Time In")
-    sheet.update_cell(1, 7, "Time (Duration)")
-    sheet.update_cell(1, 8, "Late Minutes")
-
+    sheet.update_cell(1, 5, "Reason")
+    sheet.update_cell(1, 6, "Time Out")
+    sheet.update_cell(1, 7, "Time In")
+    sheet.update_cell(1, 8, "Time (Duration)")
+    sheet.update_cell(1, 9, "Late Minutes")
+    
     return sheet
+
+#initialize Camera
+def initializecam():
+    cam = SimpleCV.Camera()
+
+    return cam
 
 #set the teachers name
 def setteachername():
     while True:
-        teacher = raw_input("Enter Teacher Name: ")
+        teach = raw_input("Enter Teacher Name: ")
         answer = raw_input("Is " + teacher + " correct? YES or NO?: ")
         if answer.lower() == "yes":
+            global teacher
+            teacher = teach
             break
 
-#make a new entry
-def newentry(sheet, row):
-    sheet.update_cell(row, 1, firstname)
-    sheet.update_cell(row, 2, lastname)
-    sheet.update_cell(row, 3, idvalue)
-    sheet.update_cell(row, 4, teacher)
-    sheet.update_cell(row, 5, datetime.datetime.now())
+#read the entry and see if the student is already signed out
+def readentry(sheet, idvalue):
+    relevant_signed_out_row = None
+    for entry in currentlysignedoutstudents:
+        if entry['id'] == idvalue:
+            relevant_signed_out_row = entry
+            break
+    if relevant_signed_out_row:
+        finishhallpassentry(relevant_signed_out_row['row'])
+    else:
+        newentry(sheet, row)
 
+#make a new entry and give reason
+def newentry(sheet, localrow):
+    sheet.update_cell(localrow, 1, firstname)
+    sheet.update_cell(localrow, 2, lastname)
+    sheet.update_cell(localrow, 3, idvalue)
+    sheet.update_cell(localrow, 4, teacher)
+    while True:
+        reason = raw_input("Enter Reason: ")
+        answer = raw_input("Is " + reason + " correct? YES or NO?: ")
+        if answer.lower() == "yes":
+            break
+    sheet.update_cell(localrow, 5, reason)
+    sheet.update_cell(localrow, 6, datetime.datetime.now())
+    #add to currently signed out students
+    currentlysignedoutstudents.append({'id' : idvalue, 'row' : localrow})
+    #get ready for the next entry and increase row
+    global row
+    # TODO this doesn't seem to get run more than one time - row is always 3
+    row = row + 1
+    print("row is " + str(row))
+
+#find what camera is called
 def find_camera_path():
     filename = [x for x in os.listdir('/dev/') if x.startswith('video')][0]
     return '/dev/' + filename
 
 #take a pic
-def takepic():
-    pygame.camera.init()
-    path = find_camera_path()
-    cam = pygame.camera.Camera(path, (640,480))
-    cam.start()
-    img = cam.get_image()
-    pygame.image.save(img,"filename.jpg")
+def takepic(cam):
+    print('taking a picture!')
+    img = cam.getImage()
+    img.save("filename.jpg")
 
 #decode the pic for id value
 def decodeid():
-    idvalue = pyzbar.pyzbar.decode(Image.open('filename.jpg'))
+    image = cv2.imread('filename.jpg')
+    newidvalue = str(pyzbar.pyzbar.decode(image))
+    
+    global idvalue
+    idvalue = newidvalue[15:21]
     return idvalue
 
 #decode the pic for a name
 def readname():
     api = PyTessBaseAPI()
     api.SetImageFile('filename.jpg')
-    print(api.GetUTF8Text())
+    ##stripoutname
+    #read = api.GetUTF8Text()
+    #identify =
+    #fbegin =
+    #fend =
+    #space = 
+    #ebegin =
+    #eend=
+    #for letters in read:
+        #if (letter == identify):
+            #begin =
+        #if (letter == space
+            #end =
+    
 
 def zero_pad_integer(integer):
     return "{:0>2d}".format(integer)
 
 #finish the entry for hall pass
-def finishhallpassentry():
-    sheet.update_cell(row, 6, datetime.datetime.now())
+def finishhallpassentry(row):
+    sheet.update_cell(row, 7, datetime.datetime.now())
     #TIME DURATION COLUMN
-    out = sheet.cell(row, 5).value
-    ins = sheet.cell(row, 6).value
+    out = sheet.cell(row, 6).value
+    ins = sheet.cell(row, 7).value
     #Format numbers below 10 with padding
-    exouthour = "07" #str(out[11:13])
-    exoutmin = "05" #str(out[14:16])
-    exinshour = "09" #str(ins[11:13])
-    exinsmin = "03" #str(ins[14:16])
+    exouthour = str(out[11:13])
+    exoutmin = str(out[14:16])
+    exinshour = str(ins[11:13])
+    exinsmin = str(ins[14:16])
     #outhour
     if (exouthour[0:1] == 0):
         outhour = zero_pad_integer(int(exouthour[1:2]))
@@ -128,7 +181,7 @@ def finishhallpassentry():
         dif = (str(hourdif) + ":" + str(mindif))
     else:
         dif = (str(hourdif) + ":0" + str(mindif))
-    sheet.update_cell(row, 7, dif)
+    sheet.update_cell(row, 8, dif)
     #print
     print("hourdif is " + str(hourdif))
     print("mindif is " + str(mindif))
@@ -137,22 +190,18 @@ def finishhallpassentry():
     mindifnow = mindif - 10
     print("mindifnow is " + str(mindifnow))
     if (mindifnow >= 10): 
-        sheet.update_cell(row, 8, (str(hourdif) + ":" + str(mindifnow)))
+        sheet.update_cell(row, 9, (str(hourdif) + ":" + str(mindifnow)))
     elif (mindifnow <= 9 and mindifnow > 0):
-        sheet.update_cell(row, 8, (str(hourdif) + ":0" + str(mindifnow)))
+        sheet.update_cell(row, 9, (str(hourdif) + ":0" + str(mindifnow)))
     elif (mindifnow == 0):
-        sheet.update_cell(row, 8, (str(hourdif) + ":00"))
+        sheet.update_cell(row, 9, (str(hourdif) + ":00"))
     else:
         if (hourdif == 0):
-            sheet.update_cell(row, 8, "00:00")
+            sheet.update_cell(row, 9, "00:00")
         else:
             mindifnew = 60 + mindif
             hourdif = hourdif - 1
-            sheet.update_cell(row, 8, (str(hourdif) + ":" + str(mindifnew)))
-    # XXX jrheard look at this
-    global row
-    row = row + 1
-    print("row is " + str(row))
+            sheet.update_cell(row, 9, (str(hourdif) + ":" + str(mindifnew)))
     
     
 # Extract and print all of the values
@@ -162,25 +211,41 @@ def listrecords():
 
     
 
-
-#MEAT OF PROGRAM
+#PROGRAM
 
 sheet = setupgooglesheet()
+cam = initializecam()
 print('done with google sheets stuff')
-#setteachername()
-print("starting hp entry")
-newentry(sheet, row)
-#print('taking picture')
-#takepic()
-#print("took picture")
-#print("decoded value is", decodeid())
+setteachername()
+print("starting read entry: 1st time")
+takepic(cam)
+print("took picture")
+print("decoded value is", decodeid())
+readentry(sheet, idvalue)
+print(row)
+raw_input("Ready?")
+print("reading id again : 2nd time")
+takepic(cam)
+print("took picture")
+print("decoded value is", decodeid())
+readentry(sheet, idvalue)
+print(row)
+raw_input("Ready?")
+print("reading id again: 3rd time")
+takepic(cam)
+print("took picture")
+print("decoded value is", decodeid())
+readentry(sheet, idvalue)
+print(row)
+raw_input("Ready?")
+print("reading id again: 4th time")
+takepic(cam)
+print("took picture")
+print("decoded value is", decodeid())
+readentry(sheet, idvalue)
+print(row)
+
+
 #readname()
 #print("tesseract found this text in the picture: ", name)
-print("finishing hp entry")
-finishhallpassentry()
-print("finished hp entry")
-print("starting 2nd hp entry")
-newentry(sheet, row)
-print("finishing 2nd hp entry")
-finishhallpassentry()
-print("finished 2nd hp entry")
+#print("finishing hp entry")
