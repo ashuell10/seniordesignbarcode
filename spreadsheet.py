@@ -55,23 +55,31 @@ def initializecam():
 
 #set the teachers name
 def setteachername():
+    global teacher
     while True:
         teach = raw_input("Enter Teacher Name: ")
         answer = raw_input("Is " + teacher + " correct? YES or NO?: ")
         if answer.lower() == "yes":
-            global teacher
             teacher = teach
             break
+
+def find_id_in_signed_out_students(idvalue):
+    for i, entry in enumerate(currentlysignedoutstudents):
+        if entry['id'] == idvalue:
+            return i
+
+    return -1
 
 #read the entry and see if the student is already signed out
 def readentry(sheet, idvalue):
     relevant_signed_out_row = None
-    for entry in currentlysignedoutstudents:
-        if entry['id'] == idvalue:
-            relevant_signed_out_row = entry
-            break
+    
+    signed_out_index = find_id_in_signed_out_students(idvalue)
+    if signed_out_index > -1:
+        relevant_signed_out_row = currentlysignedoutstudents[signed_out_index]
+
     if relevant_signed_out_row:
-        finishhallpassentry(relevant_signed_out_row['row'])
+        finishhallpassentry(relevant_signed_out_row['row'], relevant_signed_out_row['id'])
     else:
         newentry(sheet, row)
 
@@ -139,7 +147,7 @@ def zero_pad_integer(integer):
     return "{:0>2d}".format(integer)
 
 #finish the entry for hall pass
-def finishhallpassentry(row):
+def finishhallpassentry(row, idvalue):
     sheet.update_cell(row, 7, datetime.datetime.now())
     #TIME DURATION COLUMN
     out = sheet.cell(row, 6).value
@@ -202,6 +210,9 @@ def finishhallpassentry(row):
             mindifnew = 60 + mindif
             hourdif = hourdif - 1
             sheet.update_cell(row, 9, (str(hourdif) + ":" + str(mindifnew)))
+    #remove the entry in signed out students
+    index = find_id_in_signed_out_students(idvalue)
+    currentlysignedoutstudents.pop(index)
     
     
 # Extract and print all of the values
