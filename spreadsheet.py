@@ -9,6 +9,7 @@ import pyzbar.pyzbar
 from PIL import Image
 from tesserocr import PyTessBaseAPI
 import SimpleCV
+import time
 
 #globalvariables
 row = 2
@@ -128,19 +129,19 @@ def decodeid():
 def readname():
     api = PyTessBaseAPI()
     api.SetImageFile('filename.jpg')
-    ##stripoutname
-    #read = api.GetUTF8Text()
-    #identify =
-    #fbegin =
-    #fend =
-    #space = 
-    #ebegin =
-    #eend=
-    #for letters in read:
-        #if (letter == identify):
-            #begin =
-        #if (letter == space
-            #end =
+    #stripoutname
+    """read = api.GetUTF8Text()
+    identify =
+    fbegin =
+    fend =
+    space = 
+    ebegin =
+    eend=
+    for letters in read:
+        if (letter == identify):
+            begin =
+        if (letter == space
+            end ="""
     
 
 def zero_pad_integer(integer):
@@ -226,6 +227,19 @@ def listrecords():
 
 sheet = setupgooglesheet()
 cam = initializecam()
+setteachername()
+while True:
+    takepic(cam)
+    decodeid()
+    if (idvalue != ""):
+        readentry(sheet,idvalue)
+        time.sleep(5)
+
+    time.sleep(1)
+
+
+"""sheet = setupgooglesheet()
+cam = initializecam()
 print('done with google sheets stuff')
 setteachername()
 print("starting read entry: 1st time")
@@ -254,9 +268,9 @@ takepic(cam)
 print("took picture")
 print("decoded value is", decodeid())
 readentry(sheet, idvalue)
-print(row)
+print(row)"""
 
 
-#readname()
-#print("tesseract found this text in the picture: ", name)
-#print("finishing hp entry")
+"""readname()
+print("tesseract found this text in the picture: ", name)
+print("finishing hp entry")"""
