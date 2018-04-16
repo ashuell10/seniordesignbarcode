@@ -13,6 +13,7 @@ import time
 
 #globalvariables
 row = 2
+stored_image_counter = 1
 
 idvalue = 0
 name = "tempname"
@@ -119,6 +120,7 @@ def takepic(cam):
     print('taking a picture!')
     img = cam.getImage()
     img.save("filename.jpg")
+    return img
 
 #decode the pic for id value
 def decodeid():
@@ -234,9 +236,13 @@ sheet = setupgooglesheet()
 cam = initializecam()
 setteachername()
 while True:
-    takepic(cam)
+    img = takepic(cam)
     decodeid()
     if (idvalue != ""):
+        # We've found an image with a barcode in it! Save the image for later analysis.
+        img.save('saved_images/{}.jpg'.format(stored_image_counter))
+        stored_image_counter += 1
+
         readentry(sheet,idvalue)
         readname()
         time.sleep(5)
