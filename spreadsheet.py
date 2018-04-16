@@ -90,11 +90,15 @@ def newentry(sheet, localrow):
     sheet.update_cell(localrow, 2, lastname)
     sheet.update_cell(localrow, 3, idvalue)
     sheet.update_cell(localrow, 4, teacher)
-    while True:
+    #comment out for prototype
+    """while True:
         reason = raw_input("Enter Reason: ")
         answer = raw_input("Is " + reason + " correct? YES or NO?: ")
         if answer.lower() == "yes":
-            break
+            break"""
+    #added lines
+    reason = "BR"
+    #continue rest of program
     sheet.update_cell(localrow, 5, reason)
     sheet.update_cell(localrow, 6, datetime.datetime.now())
     #add to currently signed out students
@@ -130,8 +134,9 @@ def readname():
     api = PyTessBaseAPI()
     api.SetImageFile('filename.jpg')
     #stripoutname
-    """read = api.GetUTF8Text()
-    identify =
+    read = api.GetUTF8Text()
+    print(read)
+    """identify =
     fbegin =
     fend =
     space = 
@@ -233,6 +238,7 @@ while True:
     decodeid()
     if (idvalue != ""):
         readentry(sheet,idvalue)
+        readname()
         time.sleep(5)
 
     time.sleep(1)
