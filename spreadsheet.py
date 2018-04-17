@@ -166,20 +166,6 @@ def readname():
     else:
         print("Google vision API wasn't able to extract a name from this image!")
 
-    #stripoutname
-    """read = api.GetUTF8Text()
-    identify =
-    fbegin =
-    fend =
-    space = 
-    ebegin =
-    eend=
-    for letters in read:
-        if (letter == identify):
-            begin =
-        if (letter == space
-            end ="""
-    
 
 def zero_pad_integer(integer):
     return "{:0>2d}".format(integer)
@@ -273,6 +259,13 @@ while True:
         img.save('saved_images/{}.jpg'.format(stored_image_counter))
         stored_image_counter += 1
 
+        name = readname()
+        if name:
+            print("goog found this text in the picture: ", name)
+        else:
+            print("goog couldn't find a name in this picture")
+        print("finishing hp entry")
+
         readentry(sheet,idvalue)
         time.sleep(5)
 
@@ -310,11 +303,3 @@ print("took picture")
 print("decoded value is", decodeid())
 readentry(sheet, idvalue)
 print(row)"""
-
-
-name = readname()
-if name:
-    print("goog found this text in the picture: ", name)
-else:
-    print("goog couldn't find a name in this picture")
-print("finishing hp entry")
