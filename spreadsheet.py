@@ -7,16 +7,23 @@ import pygame
 import pygame.camera
 import pyzbar.pyzbar
 from PIL import Image
-from tesserocr import PyTessBaseAPI
 import SimpleCV
 import time
+
+# TODO - follow instructions on https://cloud.google.com/vision/docs/libraries#client-libraries-install-python to install / setup library
+# set env var
+from google.cloud import vision
+from google.cloud.vision import types
+
+client = vision.ImageAnnotatorClient()
+
+
 
 #globalvariables
 row = 2
 stored_image_counter = 1
 
 idvalue = 0
-name = "tempname"
 firstname = "first"
 lastname = "last"
 teacher = "teacher"
@@ -133,23 +140,36 @@ def decodeid():
 
 #decode the pic for a name
 def readname():
-    api = PyTessBaseAPI()
-    api.SetImageFile('filename.jpg')
-    #stripoutname
-    read = api.GetUTF8Text()
-    print(read)
-    """identify =
-    fbegin =
-    fend =
-    space = 
-    ebegin =
-    eend=
-    for letters in read:
-        if (letter == identify):
-            begin =
-        if (letter == space
-            end ="""
-    
+    # NOTE: Only call this function if we've successfully found a student ID, since it costs a tiny tiny tiny amount of money.
+
+    # Load up the image.
+    with io.open('filename.jpg', 'rb') as image_file:
+        content = image_file.read()
+
+    image = types.Image(content=content)
+
+    # Make the API request.
+    response = client.document_text_detection(image)
+
+    if response.text_annotations:
+        # Extract the name from the response.
+        # `text` will look like eg 'Senators\nCURTIS FIELDS\nID# 549466\nGr\n'.
+        text = response.text_annotations[0].description
+
+        lines = text.split('\n')
+        name_lines = [
+            line
+            for line in lines
+            if line.isupper()
+            and not line.startswith('ID#')
+        ]
+        if name_lines and len(name_lines) == 1:
+            return name_lines[0]
+        else:
+            print("We didn't see anything resembling a name in {}!".format(text))
+    else:
+        print("Google vision API wasn't able to extract a name from this image!")
+
 
 def zero_pad_integer(integer):
     return "{:0>2d}".format(integer)
@@ -243,6 +263,13 @@ while True:
         img.save('saved_images/{}.jpg'.format(stored_image_counter))
         stored_image_counter += 1
 
+        name = readname()
+        if name:
+            print("goog found this text in the picture: ", name)
+        else:
+            print("goog couldn't find a name in this picture")
+        print("finishing hp entry")
+
         readentry(sheet,idvalue)
         readname()
         time.sleep(5)
@@ -281,8 +308,3 @@ print("took picture")
 print("decoded value is", decodeid())
 readentry(sheet, idvalue)
 print(row)"""
-
-
-"""readname()
-print("tesseract found this text in the picture: ", name)
-print("finishing hp entry")"""
