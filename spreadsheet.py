@@ -2,6 +2,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import cv2
 import datetime
+import io
 import os
 import pygame
 import pygame.camera
@@ -9,15 +10,32 @@ import pyzbar.pyzbar
 from PIL import Image
 import SimpleCV
 import time
+import traceback
+import re
 
-# TODO - follow instructions on https://cloud.google.com/vision/docs/libraries#client-libraries-install-python to install / setup library
-# set env var
+# TODOS 4/26/18
+# how do we find the latest unused row?
+#     ally says (and JR agrees): write code that checks the spreadsheet (forloop until you find first empty row?)
+# what happens if/when the program crashes? (RESOLVED WITH MAIN_LOOP APPROACH)
+#   TODO TODO XXXXXX: TEST TO MAKE SURE THIS ACTUALLY WORKS, MAYBE MANUALLY TRIGGER AN ERROR SOMEHOW
+# related: how do we _find out_ that it crashed, and how do we figure out _why_ it did that so we can improve the program?
+
+# TODO - sometimes the barcode is scanned as a word
+# TODO RELATED TO THAT: try to reproduce the bug so we can fix it!
+
+
+
+
+
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/pi/Barcode/client_secret.json'
+
 from google.cloud import vision
 from google.cloud.vision import types
 
+
 client = vision.ImageAnnotatorClient()
 
-
+#Check pic in folder monday and then maybe separate out the names
 
 #globalvariables
 row = 2
@@ -55,6 +73,14 @@ def setupgooglesheet():
     sheet.update_cell(1, 9, "Late Minutes")
     
     return sheet
+
+#find first empty row
+def findfirstemptyrow():
+    for i, col_value in enumerate(sheet.col_values(1)):
+        if col_value == "":
+            global row
+            row = i + 1
+            break
 
 #initialize Camera
 def initializecam():
@@ -94,8 +120,8 @@ def readentry(sheet, idvalue):
 
 #make a new entry and give reason
 def newentry(sheet, localrow):
-    sheet.update_cell(localrow, 1, firstname)
-    sheet.update_cell(localrow, 2, lastname)
+    sheet.update_cell(localrow, 1, lastname)
+    sheet.update_cell(localrow, 2, firstname)
     sheet.update_cell(localrow, 3, idvalue)
     sheet.update_cell(localrow, 4, teacher)
     #comment out for prototype
@@ -157,18 +183,40 @@ def readname():
         text = response.text_annotations[0].description
 
         lines = text.split('\n')
+        lines = lines[lines.index('Senators'):]
         name_lines = [
             line
             for line in lines
             if line.isupper()
             and not line.startswith('ID#')
+            and line.lower() != 'senators'
+            and len(line) > 3
+            # TODO - come back and figure out how to make this more general
+            and not line.startswith('JUN ')
         ]
         if name_lines and len(name_lines) == 1:
-            return name_lines[0]
+            # Sometimes this can look like 'ALEXANDRIA SHUELL O',
+            # so we want to remove any extraneous numbers.
+            name = name_lines[0]
+            name = re.sub(r"[0-9]", "", name).strip()
+            namesplit = name.split(" ")
+            global lastname
+            lastname = namesplit[-1]
+            global firstname
+            firstname = " ".join(namesplit[:-1])
+            return name
         else:
             print("We didn't see anything resembling a name in {}!".format(text))
+            global lastname
+            lastname = "ERROR"
+            global firstname
+            firstname = "ERROR"
     else:
         print("Google vision API wasn't able to extract a name from this image!")
+        global lastname
+        lastname = "ERROR"
+        global firstname
+        firstname = "ERROR"
 
 
 def zero_pad_integer(integer):
@@ -250,31 +298,52 @@ def listrecords():
 
     
 
+def main_loop():
+    while True:
+        img = takepic(cam)
+        decodeid()
+        if (idvalue != ""):
+            # We've found an image with a barcode in it! Save the image for later analysis.
+            global stored_image_counter
+            img.save('saved_images/{}.jpg'.format(stored_image_counter))
+            stored_image_counter += 1
+
+            name = readname()
+            if name:
+                print("goog found this text in the picture: ", name)
+                print("First Name: ", firstname, "Last Name: ", lastname)
+            else:
+                print("goog couldn't find a name in this picture")
+                global lastname
+                lastname = "ERROR"
+                global firstname
+                firstname = "ERROR"
+            print("finishing hp entry")
+
+            readentry(sheet,idvalue)
+            readname()
+            time.sleep(5)
+
+        time.sleep(1)
+
+
 #PROGRAM
 
 sheet = setupgooglesheet()
 cam = initializecam()
 setteachername()
+findfirstemptyrow()
+print("row is ", row)
+
 while True:
-    img = takepic(cam)
-    decodeid()
-    if (idvalue != ""):
-        # We've found an image with a barcode in it! Save the image for later analysis.
-        img.save('saved_images/{}.jpg'.format(stored_image_counter))
-        stored_image_counter += 1
+    try:
+        main_loop()
+    except Exception as e:
+        # TODO - figure out how to log this to a file
+        traceback.print_exc()
+        with open('logfile.txt', 'a') as f:
+            f.write('{}: oh no, the program crashed with this error: {}'.format(datetime.datetime.now(), e))
 
-        name = readname()
-        if name:
-            print("goog found this text in the picture: ", name)
-        else:
-            print("goog couldn't find a name in this picture")
-        print("finishing hp entry")
-
-        readentry(sheet,idvalue)
-        readname()
-        time.sleep(5)
-
-    time.sleep(1)
 
 
 """sheet = setupgooglesheet()
